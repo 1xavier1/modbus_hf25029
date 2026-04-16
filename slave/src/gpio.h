@@ -9,6 +9,7 @@
 
 // GPIO initialization
 int gpio_init(void);
+int gpio_init_with_config(const char *config_file);
 void gpio_cleanup(void);
 
 // Read single DI channel

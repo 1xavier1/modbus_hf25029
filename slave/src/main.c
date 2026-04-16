@@ -19,13 +19,14 @@
 // Command Line Options
 // ========================================================================
 
-static const char *optstring = "m:d:b:p:vh";
+static const char *optstring = "m:d:b:p:c:vh";
 
 static struct option longopts[] = {
     {"mode",   required_argument, NULL, 'm'},
     {"device", required_argument, NULL, 'd'},
     {"baud",   required_argument, NULL, 'b'},
     {"parity", required_argument, NULL, 'p'},
+    {"config", required_argument, NULL, 'c'},
     {"verbose", no_argument,       NULL, 'v'},
     {"help",   no_argument,       NULL, 'h'},
     {0, 0, 0, 0}
@@ -38,11 +39,12 @@ static void print_usage(const char *prog) {
     printf("  -d, --device <dev>   RTU device path (default: /dev/ttyAS2)\n");
     printf("  -b, --baud <baud>    RTU baudrate (default: 115200)\n");
     printf("  -p, --parity <p>     RTU parity: n, o, e (default: n)\n");
+    printf("  -c, --config <file>  GPIO config file (default: built-in)\n");
     printf("  -v, --verbose       Enable verbose logging\n");
     printf("  -h, --help          Show this help\n");
     printf("\nExample:\n");
     printf("  %s -m both -d /dev/ttyAS2 -b 115200\n", prog);
-    printf("  %s -m tcp -v\n", prog);
+    printf("  %s -m tcp -c /root/gpio_config.json\n", prog);
 }
 
 // ========================================================================
@@ -76,6 +78,7 @@ int main(int argc, char *argv[]) {
     const char *rtu_device = MODBUS_RTU_DEFAULT_DEV;
     int rtu_baud = MODBUS_RTU_DEFAULT_BAUD;
     char rtu_parity = MODBUS_RTU_DEFAULT_PARITY;
+    const char *gpio_config_file = NULL;
 
     // Parse command line options
     int opt;
@@ -105,6 +108,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'p':
             rtu_parity = optarg[0];
+            break;
+        case 'c':
+            gpio_config_file = optarg;
             break;
         case 'v':
             g_log_level = LOG_LEVEL_DEBUG;
@@ -139,8 +145,9 @@ int main(int argc, char *argv[]) {
     data_sim_init();
 
     // Initialize GPIO (optional, will use simulated data if fails)
-    printf("[MAIN] Initializing GPIO...\n");
-    if (gpio_init() == 0) {
+    printf("[MAIN] Initializing GPIO from %s...\n",
+           gpio_config_file ? gpio_config_file : "default config");
+    if (gpio_init_with_config(gpio_config_file) == 0) {
         printf("[MAIN] GPIO initialized\n");
     } else {
         printf("[MAIN] GPIO init failed, using simulated data\n");

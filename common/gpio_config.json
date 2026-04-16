@@ -1,0 +1,50 @@
+{
+    "comment": "HF25029-CDP GPIO Configuration",
+    "version": "1.0",
+
+    "di": {
+        "channel_count": 22,
+        "channels": [
+            {"id": 0,  "gpio": 34,  "name": "PB2",  "label": "DI_CH01"},
+            {"id": 1,  "gpio": 129, "name": "PE1",  "label": "DI_CH02"},
+            {"id": 2,  "gpio": 130, "name": "PE2",  "label": "DI_CH03"},
+            {"id": 3,  "gpio": 131, "name": "PE3",  "label": "DI_CH04"},
+            {"id": 4,  "gpio": 132, "name": "PE4",  "label": "DI_CH05"},
+            {"id": 5,  "gpio": 297, "name": "PJ9",  "label": "DI_CH06"},
+            {"id": 6,  "gpio": 326, "name": "PK6",  "label": "DI_CH07"},
+            {"id": 7,  "gpio": 35,  "name": "PB3",  "label": "DI_CH08"},
+            {"id": 8,  "gpio": 136, "name": "PE8",  "label": "DI_CH09"},
+            {"id": 9,  "gpio": 137, "name": "PE9",  "label": "DI_CH10"},
+            {"id": 10, "gpio": 138, "name": "PE10", "label": "DI_CH11"},
+            {"id": 11, "gpio": 139, "name": "PE11", "label": "DI_CH12"},
+            {"id": 12, "gpio": 140, "name": "PE12", "label": "DI_CH13"},
+            {"id": 13, "gpio": 141, "name": "PE13", "label": "DI_CH14"},
+            {"id": 14, "gpio": 142, "name": "PE14", "label": "DI_CH15"},
+            {"id": 15, "gpio": 143, "name": "PE15", "label": "DI_CH16"},
+            {"id": 16, "gpio": 144, "name": "PF0",  "label": "DI_CH17"},
+            {"id": 17, "gpio": 145, "name": "PF1",  "label": "DI_CH18"},
+            {"id": 18, "gpio": 146, "name": "PF2",  "label": "DI_CH19"},
+            {"id": 19, "gpio": 147, "name": "PF3",  "label": "DI_CH20"},
+            {"id": 20, "gpio": 148, "name": "PF4",  "label": "DI_CH21"},
+            {"id": 21, "gpio": 149, "name": "PF5",  "label": "DI_CH22"}
+        ]
+    },
+
+    "do": {
+        "channel_count": 12,
+        "channels": [
+            {"id": 0,  "gpio": 35,  "name": "PB3",  "label": "DO_CH01"},
+            {"id": 1,  "gpio": 36,  "name": "PB4",  "label": "DO_CH02"},
+            {"id": 2,  "gpio": 37,  "name": "PB5",  "label": "DO_CH03"},
+            {"id": 3,  "gpio": 38,  "name": "PB6",  "label": "DO_CH04"},
+            {"id": 4,  "gpio": 39,  "name": "PB7",  "label": "DO_CH05"},
+            {"id": 5,  "gpio": 40,  "name": "PB8",  "label": "DO_CH06"},
+            {"id": 6,  "gpio": 41,  "name": "PB9",  "label": "DO_CH07"},
+            {"id": 7,  "gpio": 42,  "name": "PB10", "label": "DO_CH08"},
+            {"id": 8,  "gpio": 43,  "name": "PB11", "label": "DO_CH09"},
+            {"id": 9,  "gpio": 44,  "name": "PB12", "label": "DO_CH10"},
+            {"id": 10, "gpio": 45,  "name": "PB13", "label": "DO_CH11"},
+            {"id": 11, "gpio": 46,  "name": "PB14", "label": "DO_CH12"}
+        ]
+    }
+}
