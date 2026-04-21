@@ -3,7 +3,7 @@
 
 #include "modbus_func.h"
 #include "register_map.h"
-#include "data_sim.h"
+#include "hardware.h"
 #include "gpio.h"
 #include "serial.h"
 #include "modbus_rtu.h"
@@ -19,32 +19,35 @@
 // Command Line Options
 // ========================================================================
 
-static const char *optstring = "m:d:b:p:c:vh";
+static const char *optstring = "m:d:b:p:c:n:vh";
 
 static struct option longopts[] = {
-    {"mode",   required_argument, NULL, 'm'},
-    {"device", required_argument, NULL, 'd'},
-    {"baud",   required_argument, NULL, 'b'},
-    {"parity", required_argument, NULL, 'p'},
-    {"config", required_argument, NULL, 'c'},
-    {"verbose", no_argument,       NULL, 'v'},
-    {"help",   no_argument,       NULL, 'h'},
+    {"mode",      required_argument, NULL, 'm'},
+    {"device",    required_argument, NULL, 'd'},
+    {"baud",      required_argument, NULL, 'b'},
+    {"parity",    required_argument, NULL, 'p'},
+    {"gpio-config", required_argument, NULL, 'c'},
+    {"net-config", required_argument, NULL, 'n'},
+    {"verbose",   no_argument,       NULL, 'v'},
+    {"help",      no_argument,       NULL, 'h'},
     {0, 0, 0, 0}
 };
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [options]\n", prog);
     printf("\nOptions:\n");
-    printf("  -m, --mode <mode>    Operation mode: rtu, tcp, both (default: both)\n");
-    printf("  -d, --device <dev>   RTU device path (default: /dev/ttyAS2)\n");
-    printf("  -b, --baud <baud>    RTU baudrate (default: 115200)\n");
-    printf("  -p, --parity <p>     RTU parity: n, o, e (default: n)\n");
-    printf("  -c, --config <file>  GPIO config file (default: built-in)\n");
-    printf("  -v, --verbose       Enable verbose logging\n");
-    printf("  -h, --help          Show this help\n");
+    printf("  -m, --mode <mode>       Operation mode: rtu, tcp, both (default: both)\n");
+    printf("  -d, --device <dev>      RTU device path (default: /dev/ttyAS2)\n");
+    printf("  -b, --baud <baud>       RTU baudrate (default: 115200)\n");
+    printf("  -p, --parity <p>        RTU parity: n, o, e (default: n)\n");
+    printf("  -c, --gpio-config <f>   GPIO config file (default: built-in)\n");
+    printf("  -n, --net-config <f>    Network config file (default: /etc/modbus_slave/network.conf)\n");
+    printf("  -v, --verbose           Enable verbose logging\n");
+    printf("  -h, --help              Show this help\n");
     printf("\nExample:\n");
     printf("  %s -m both -d /dev/ttyAS2 -b 115200\n", prog);
     printf("  %s -m tcp -c /root/gpio_config.json\n", prog);
+    printf("  %s -m tcp -n /root/network.conf\n", prog);
 }
 
 // ========================================================================
@@ -79,6 +82,7 @@ int main(int argc, char *argv[]) {
     int rtu_baud = MODBUS_RTU_DEFAULT_BAUD;
     char rtu_parity = MODBUS_RTU_DEFAULT_PARITY;
     const char *gpio_config_file = NULL;
+    const char *network_config_file = NULL;
 
     // Parse command line options
     int opt;
@@ -112,6 +116,9 @@ int main(int argc, char *argv[]) {
         case 'c':
             gpio_config_file = optarg;
             break;
+        case 'n':
+            network_config_file = optarg;
+            break;
         case 'v':
             g_log_level = LOG_LEVEL_DEBUG;
             break;
@@ -140,9 +147,15 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    // Initialize data simulator
-    printf("[MAIN] Initializing data simulator...\n");
-    data_sim_init();
+    // Initialize hardware
+    printf("[MAIN] Initializing hardware...\n");
+    hardware_init();
+
+    // Load network config if specified
+    if (network_config_file) {
+        printf("[MAIN] Loading network config from %s...\n", network_config_file);
+        hardware_load_config(network_config_file);
+    }
 
     // Initialize GPIO (optional, will use simulated data if fails)
     printf("[MAIN] Initializing GPIO from %s...\n",
@@ -164,11 +177,10 @@ int main(int argc, char *argv[]) {
         pthread_create(&g_tcp_thread, NULL, tcp_slave_thread, NULL);
     }
 
-    // Main loop - update simulation
+    // Main loop
     printf("[MAIN] Entering main loop...\n");
     while (!g_quit) {
-        data_sim_update(DATA_SIM_TICK_MS);
-        msleep(DATA_SIM_TICK_MS);
+        sleep(1);
     }
 
     // Wait for threads
@@ -178,6 +190,9 @@ int main(int argc, char *argv[]) {
     if (mode_tcp) {
         pthread_join(g_tcp_thread, NULL);
     }
+
+    // Cleanup hardware
+    hardware_release();
 
     printf("[MAIN] Exit\n");
     return 0;

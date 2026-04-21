@@ -34,4 +34,4 @@ CROSS_CFLAGS = $(CFLAGS) -march=armv7-a -mfpu=neon -mfloat-abi=hard
 CROSS_TARGET = bin/modbus_slave_rt_arm
 
 cross:
-	$(CROSS_CC) $(CROSS_CFLAGS) -o $(CROSS_TARGET) $(SRC) $(LDFLAGS) $(LIBS)
+	$(CROSS_CC) $(CROSS_CFLAGS) -o $(CROSS_TARGET) $(SRC) $(LDFLAGS) $(COMMON_LIB) $(LIBS)

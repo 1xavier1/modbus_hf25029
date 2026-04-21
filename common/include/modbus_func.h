@@ -63,7 +63,7 @@ extern pthread_t g_sync_thread;
 // ========================================================================
 // Modbus RTU
 // ========================================================================
-#define MODBUS_RTU_DEFAULT_DEV         "/dev/ttyAS2"
+#define MODBUS_RTU_DEFAULT_DEV         "/dev/ttyAS0"
 #define MODBUS_RTU_DEFAULT_BAUD       115200
 #define MODBUS_RTU_DEFAULT_BITS       8
 #define MODBUS_RTU_DEFAULT_PARITY     'N'

@@ -4,12 +4,15 @@
 #include "rt_sync.h"
 #include "rt_utils.h"
 #include "modbus_func.h"
-#include "data_sim.h"
+#include "hardware.h"
 #include <stdio.h>
 #include <time.h>
 
 // Sync period: 10ms
 #define SYNC_PERIOD_US   10000
+
+// Persist flush period: 5 seconds
+#define PERSIST_FLUSH_PERIOD_MS  5000
 
 void* rt_sync_thread(void *arg) {
     (void)arg;
@@ -22,12 +25,26 @@ void* rt_sync_thread(void *arg) {
     uint64_t loop_count = 0;
     int64_t max_latency = 0;
     int64_t total_latency = 0;
+    uint64_t last_persist_flush = rt_get_time_ms();
 
     while (!g_quit) {
         uint64_t t1 = rt_get_time_us();
 
-        // Update data simulation
-        data_sim_update(DATA_SIM_TICK_MS);
+        // Poll RS485 channels for joystick/hand controller data
+        // Debug: call counter
+        static int poll_cnt = 0;
+        if (poll_cnt < 3) {
+            RT_LOG_INFO("Calling hardware_rs485_poll_all");
+            poll_cnt++;
+        }
+        hardware_rs485_poll_all();
+
+        // Periodic persist flush (every 5 seconds)
+        uint64_t now_ms = rt_get_time_ms();
+        if ((now_ms - last_persist_flush) >= PERSIST_FLUSH_PERIOD_MS) {
+            hardware_persist_flush();
+            last_persist_flush = now_ms;
+        }
 
         // Update next period
         rt_add_timespec(&next_time, SYNC_PERIOD_US);
@@ -51,6 +68,9 @@ void* rt_sync_thread(void *arg) {
         // Sleep until next period
         clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next_time, NULL);
     }
+
+    // Final flush before exit
+    hardware_persist_flush();
 
     RT_LOG_INFO("SYNC thread exiting");
     return NULL;

@@ -23,8 +23,8 @@ static uint16_t g_do_status = 0;
 // Potentiometer values (5 channels, 0-4095)
 static uint16_t g_pot_gain[5] = {0, 1024, 2048, 3072, 4095};
 
-// RS485 data (5 channels, max 10 bytes each)
-static uint8_t g_rs485_data[5][10];
+// RS485 data (5 channels, max 3 bytes each, V1.2)
+static uint8_t g_rs485_data[5][3];
 static uint8_t g_rs485_len[5] = {0, 0, 0, 0, 0};
 static uint8_t g_rs485_stat[5] = {0, 0, 0, 0, 0};
 
@@ -57,6 +57,9 @@ static uint8_t g_rs485_param[5][4] = {
     {BAUD_115200, 8, 1, 0},
     {BAUD_115200, 8, 1, 0}
 };
+
+// RS485 protocol selection (V1.2新增, 1-6)
+static uint8_t g_rs485_proto[5] = {1, 1, 1, 1, 1};
 
 // Simulation timing
 static uint32_t g_tick_ms = 0;
@@ -94,12 +97,10 @@ void data_sim_init(void) {
 
     // Initialize RS485 with some data
     for (int i = 0; i < 5; i++) {
-        g_rs485_len[i] = 10;
+        g_rs485_len[i] = 3;
         g_rs485_data[i][0] = 0xAA;  // Header
         g_rs485_data[i][1] = g_rs485_seq[i];
-        for (int j = 2; j < 10; j++) {
-            g_rs485_data[i][j] = simple_rand() & 0xFF;
-        }
+        g_rs485_data[i][2] = simple_rand() & 0xFF;
         g_rs485_stat[i] = 0x01;  // Data ready
     }
 
@@ -175,7 +176,7 @@ void data_sim_update(uint32_t tick_ms) {
         g_last_pot_update = g_tick_ms;
     }
 
-    // Update RS485 data (every 20ms)
+    // Update RS485 data (every 20ms, V1.2: max 3 bytes)
     if (g_tick_ms - g_last_rs485_update >= DATA_SIM_RS485_UPDATE_MS) {
         for (int i = 0; i < 5; i++) {
             // Update sequence number
@@ -183,13 +184,9 @@ void data_sim_update(uint32_t tick_ms) {
 
             g_rs485_data[i][0] = 0xAA;  // Header
             g_rs485_data[i][1] = g_rs485_seq[i];
+            g_rs485_data[i][2] = simple_rand() & 0xFF;
 
-            // Generate random payload
-            int payload_len = (simple_rand() % 8) + 2;  // 2-9 bytes payload
-            for (int j = 2; j < payload_len + 2 && j < 10; j++) {
-                g_rs485_data[i][j] = simple_rand() & 0xFF;
-            }
-            g_rs485_len[i] = payload_len + 2;
+            g_rs485_len[i] = 3;  // Fixed 3 bytes (V1.2)
 
             // Set data ready flag
             g_rs485_stat[i] = 0x01;  // Data ready
@@ -415,6 +412,22 @@ void data_sim_set_rs485_param(uint8_t channel,
     g_rs485_param[channel][1] = databits;
     g_rs485_param[channel][2] = stopbits;
     g_rs485_param[channel][3] = parity;
+}
+
+// ========================================================================
+// RS485 Protocol Configuration (V1.2 新增)
+// ========================================================================
+
+uint8_t data_sim_get_rs485_proto(uint8_t channel) {
+    if (channel >= 5) return 0;
+    return g_rs485_proto[channel];
+}
+
+void data_sim_set_rs485_proto(uint8_t channel, uint8_t protocol) {
+    if (channel >= 5) return;
+    if (protocol < 1) protocol = 1;
+    if (protocol > 6) protocol = 6;
+    g_rs485_proto[channel] = protocol;
 }
 
 // ========================================================================

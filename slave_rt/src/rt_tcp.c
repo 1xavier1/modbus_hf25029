@@ -5,7 +5,7 @@
 #include "rt_utils.h"
 #include "modbus_func.h"
 #include "register_map.h"
-#include "data_sim.h"
+#include "hardware.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,13 +26,73 @@ static int process_tcp_request(const uint8_t *req, int req_len,
     uint8_t unit_id = req[6];
     uint8_t func_code = req[7];
 
-    if (unit_id != data_sim_get_slave_addr() && unit_id != 0) {
+    if (unit_id != hardware_get_slave_addr() && unit_id != 0) {
         return -1;
     }
 
     int payload_len = 0;
 
     switch (func_code) {
+        case MODBUS_FC_READ_HOLDING_REG: {
+            uint16_t start = (req[8] << 8) | req[9];
+            uint16_t quantity = (req[10] << 8) | req[11];
+
+            resp[8] = quantity * 2;
+            int idx = 9;
+
+            for (int i = 0; i < quantity; i++) {
+                uint16_t addr = start + i;
+                uint16_t value = 0;
+
+                if (addr >= REG_DEVICE_ADDR && addr <= REG_DEVICE_ADDR) {
+                    value = hardware_get_slave_addr();
+                } else if (addr >= REG_BAUDRATE && addr <= REG_BAUDRATE) {
+                    value = hardware_get_baudrate();
+                } else if (addr >= REG_PARITY && addr <= REG_PARITY) {
+                    value = hardware_get_parity();
+                } else if (addr >= REG_IP_BASE && addr < REG_IP_BASE + REG_IP_COUNT) {
+                    int idx_ip = addr - REG_IP_BASE;
+                    uint8_t ip[4];
+                    hardware_get_ip_addr(ip);
+                    value = ip[idx_ip];
+                } else if (addr >= REG_NETMASK_BASE && addr < REG_NETMASK_BASE + REG_NETMASK_COUNT) {
+                    int idx_ip = addr - REG_NETMASK_BASE;
+                    uint8_t netmask[4];
+                    hardware_get_netmask(netmask);
+                    value = netmask[idx_ip];
+                } else if (addr >= REG_RS232_PARAM_BASE && addr < REG_RS232_PARAM_BASE + REG_RS232_PARAM_COUNT) {
+                    int ch = (addr - REG_RS232_PARAM_BASE) / REG_RS232_PARAM_PER_CH;
+                    int idx_param = (addr - REG_RS232_PARAM_BASE) % REG_RS232_PARAM_PER_CH;
+                    uint8_t baud, db, sb, par;
+                    hardware_get_rs232_param(ch, &baud, &db, &sb, &par);
+                    if (idx_param == 0) value = baud;
+                    else if (idx_param == 1) value = db;
+                    else if (idx_param == 2) value = sb;
+                    else if (idx_param == 3) value = par;
+                } else if (addr >= REG_RS485_CTRL_BASE && addr < REG_RS485_CTRL_BASE + REG_RS485_CTRL_COUNT) {
+                    int ch = addr - REG_RS485_CTRL_BASE;
+                    value = hardware_get_rs485_ctrl(ch);
+                } else if (addr >= REG_RS485_PARAM_BASE && addr < REG_RS485_PARAM_BASE + REG_RS485_PARAM_COUNT) {
+                    int ch = (addr - REG_RS485_PARAM_BASE) / REG_RS485_PARAM_PER_CH;
+                    int idx_param = (addr - REG_RS485_PARAM_BASE) % REG_RS485_PARAM_PER_CH;
+                    uint8_t baud, db, sb, par;
+                    hardware_get_rs485_param(ch, &baud, &db, &sb, &par);
+                    if (idx_param == 0) value = baud;
+                    else if (idx_param == 1) value = db;
+                    else if (idx_param == 2) value = sb;
+                    else if (idx_param == 3) value = par;
+                } else if (addr >= REG_RS485_PROTO_BASE && addr < REG_RS485_PROTO_BASE + REG_RS485_PROTO_COUNT) {
+                    int ch = addr - REG_RS485_PROTO_BASE;
+                    value = hardware_get_rs485_proto(ch);
+                }
+
+                resp[idx++] = (value >> 8) & 0xFF;
+                resp[idx++] = value & 0xFF;
+            }
+            payload_len = 1 + quantity * 2;
+            break;
+        }
+
         case MODBUS_FC_READ_INPUT_REG: {
             uint16_t start = (req[8] << 8) | req[9];
             uint16_t quantity = (req[10] << 8) | req[11];
@@ -44,10 +104,10 @@ static int process_tcp_request(const uint8_t *req, int req_len,
                 uint16_t addr = start + i;
                 uint16_t value = 0;
 
-                if (addr >= REG_POT_GAIN_BASE && addr < REG_POT_GAIN_BASE + 5) {
-                    value = data_sim_get_pot_gain(addr - REG_POT_GAIN_BASE);
-                } else if (addr >= REG_DI_LATCH_BASE && addr < REG_DI_LATCH_BASE + 22) {
-                    value = (data_sim_get_di_latch() >> (addr - REG_DI_LATCH_BASE)) & 1;
+                if (addr >= REG_POT_GAIN_BASE && addr < REG_POT_GAIN_BASE + REG_POT_GAIN_COUNT) {
+                    value = hardware_get_pot_gain(addr - REG_POT_GAIN_BASE);
+                } else if (addr >= REG_DI_LATCH_BASE && addr < REG_DI_LATCH_BASE + REG_DI_LATCH_COUNT) {
+                    value = (hardware_get_di_latch() >> (addr - REG_DI_LATCH_BASE)) & 1;
                 }
 
                 resp[idx++] = (value >> 8) & 0xFF;
@@ -61,12 +121,12 @@ static int process_tcp_request(const uint8_t *req, int req_len,
             uint16_t start = (req[8] << 8) | req[9];
             uint16_t quantity = (req[10] << 8) | req[11];
 
-            uint16_t coil = data_sim_get_do_status();
+            uint16_t coil = hardware_get_do_status();
             int byte_count = (quantity + 7) / 8;
             resp[8] = byte_count;
 
             for (int i = 0; i < quantity && i < 16; i++) {
-                int bit = start - 1 + i;
+                int bit = start + i;
                 if (bit >= 0 && bit < 12) {
                     if ((coil >> bit) & 1) {
                         resp[9 + i / 8] |= (1 << (i % 8));
@@ -81,8 +141,69 @@ static int process_tcp_request(const uint8_t *req, int req_len,
             uint16_t addr = (req[8] << 8) | req[9];
             uint16_t value = (req[10] << 8) | req[11];
 
-            if (addr >= 1 && addr <= 12) {
-                data_sim_set_do(addr - 1, value != 0);
+            if (addr >= 0 && addr <= 11) {
+                hardware_set_do(addr, value != 0);
+            }
+
+            memcpy(&resp[8], &req[8], 4);
+            payload_len = 4;
+            break;
+        }
+
+        case MODBUS_FC_WRITE_SINGLE_REG: {
+            uint16_t addr = (req[8] << 8) | req[9];
+            uint16_t value = (req[10] << 8) | req[11];
+
+            if (addr == REG_DEVICE_ADDR) {
+                if (value >= 1 && value <= 247) {
+                    hardware_set_slave_addr((uint8_t)value);
+                }
+            } else if (addr == REG_BAUDRATE) {
+                hardware_set_baudrate((uint8_t)value);
+            } else if (addr == REG_PARITY) {
+                hardware_set_parity((uint8_t)value);
+            } else if (addr >= REG_IP_BASE && addr < REG_IP_BASE + REG_IP_COUNT) {
+                int idx_ip = addr - REG_IP_BASE;
+                uint8_t ip[4];
+                hardware_get_ip_addr(ip);
+                ip[idx_ip] = (uint8_t)value;
+                hardware_set_ip_addr(ip);
+            } else if (addr >= REG_NETMASK_BASE && addr < REG_NETMASK_BASE + REG_NETMASK_COUNT) {
+                int idx_ip = addr - REG_NETMASK_BASE;
+                uint8_t netmask[4];
+                hardware_get_netmask(netmask);
+                netmask[idx_ip] = (uint8_t)value;
+                hardware_set_netmask(netmask);
+            } else if (addr >= REG_RS232_PARAM_BASE && addr < REG_RS232_PARAM_BASE + REG_RS232_PARAM_COUNT) {
+                int ch = (addr - REG_RS232_PARAM_BASE) / REG_RS232_PARAM_PER_CH;
+                int idx_param = (addr - REG_RS232_PARAM_BASE) % REG_RS232_PARAM_PER_CH;
+                uint8_t baud, db, sb, par;
+                hardware_get_rs232_param(ch, &baud, &db, &sb, &par);
+                if (idx_param == 0) baud = (uint8_t)value;
+                else if (idx_param == 1) db = (uint8_t)value;
+                else if (idx_param == 2) sb = (uint8_t)value;
+                else if (idx_param == 3) par = (uint8_t)value;
+                hardware_set_rs232_param(ch, baud, db, sb, par);
+            } else if (addr >= REG_RS485_CTRL_BASE && addr < REG_RS485_CTRL_BASE + REG_RS485_CTRL_COUNT) {
+                int ch = addr - REG_RS485_CTRL_BASE;
+                hardware_set_rs485_ctrl(ch, (uint8_t)value);
+            } else if (addr >= REG_RS485_PARAM_BASE && addr < REG_RS485_PARAM_BASE + REG_RS485_PARAM_COUNT) {
+                int ch = (addr - REG_RS485_PARAM_BASE) / REG_RS485_PARAM_PER_CH;
+                int idx_param = (addr - REG_RS485_PARAM_BASE) % REG_RS485_PARAM_PER_CH;
+                uint8_t baud, db, sb, par;
+                hardware_get_rs485_param(ch, &baud, &db, &sb, &par);
+                if (idx_param == 0) baud = (uint8_t)value;
+                else if (idx_param == 1) db = (uint8_t)value;
+                else if (idx_param == 2) sb = (uint8_t)value;
+                else if (idx_param == 3) par = (uint8_t)value;
+                hardware_set_rs485_param(ch, baud, db, sb, par);
+            } else if (addr >= REG_RS485_PROTO_BASE && addr < REG_RS485_PROTO_BASE + REG_RS485_PROTO_COUNT) {
+                int ch = addr - REG_RS485_PROTO_BASE;
+                hardware_set_rs485_proto(ch, (uint8_t)value);
+            } else if (addr == REG_SAVE_PARAM) {
+                if (value == SAVE_PARAM_VALUE) {
+                    hardware_persist_flush();
+                }
             }
 
             memcpy(&resp[8], &req[8], 4);

@@ -220,6 +220,16 @@ void data_sim_set_rs485_param(uint8_t channel,
                               uint8_t parity);
 
 // ========================================================================
+// RS485 Protocol Configuration (V1.2 新增)
+// ========================================================================
+
+// Get RS485 protocol selection (1-6)
+uint8_t data_sim_get_rs485_proto(uint8_t channel);
+
+// Set RS485 protocol selection (1-6)
+void data_sim_set_rs485_proto(uint8_t channel, uint8_t protocol);
+
+// ========================================================================
 // RS232 Control
 // ========================================================================
 

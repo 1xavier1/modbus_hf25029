@@ -3,7 +3,7 @@
 
 #include "modbus_func.h"
 #include "register_map.h"
-#include "data_sim.h"
+#include "hardware.h"
 #include "rt_utils.h"
 #include "rt_gpio.h"
 #include <stdio.h>
@@ -17,27 +17,31 @@
 // Command Line Options
 // ========================================================================
 
-static const char *optstring = "m:d:b:p:vh";
+static const char *optstring = "m:d:b:p:n:c:vh";
 
 static struct option longopts[] = {
-    {"mode",   required_argument, NULL, 'm'},
-    {"device", required_argument, NULL, 'd'},
-    {"baud",   required_argument, NULL, 'b'},
-    {"parity", required_argument, NULL, 'p'},
-    {"verbose", no_argument,       NULL, 'v'},
-    {"help",   no_argument,       NULL, 'h'},
+    {"mode",         required_argument, NULL, 'm'},
+    {"device",       required_argument, NULL, 'd'},
+    {"baud",         required_argument, NULL, 'b'},
+    {"parity",       required_argument, NULL, 'p'},
+    {"net-config",   required_argument, NULL, 'n'},
+    {"gpio-config",  required_argument, NULL, 'c'},
+    {"verbose",      no_argument,       NULL, 'v'},
+    {"help",         no_argument,       NULL, 'h'},
     {0, 0, 0, 0}
 };
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [options]\n", prog);
     printf("\nOptions:\n");
-    printf("  -m, --mode <mode>    Operation mode: rtu, tcp, both (default: both)\n");
-    printf("  -d, --device <dev>   RTU device path (default: /dev/ttyAS2)\n");
-    printf("  -b, --baud <baud>    RTU baudrate (default: 115200)\n");
-    printf("  -p, --parity <p>     RTU parity: n, o, e (default: n)\n");
-    printf("  -v, --verbose       Enable verbose logging\n");
-    printf("  -h, --help          Show this help\n");
+    printf("  -m, --mode <mode>       Operation mode: rtu, tcp, both (default: both)\n");
+    printf("  -d, --device <dev>      RTU device path (default: /dev/ttyAS2)\n");
+    printf("  -b, --baud <baud>       RTU baudrate (default: 115200)\n");
+    printf("  -p, --parity <p>        RTU parity: n, o, e (default: n)\n");
+    printf("  -n, --net-config <f>   Network config file\n");
+    printf("  -c, --gpio-config <f>   GPIO config file\n");
+    printf("  -v, --verbose           Enable verbose logging\n");
+    printf("  -h, --help              Show this help\n");
     printf("\nRT Options:\n");
     printf("  Real-time threads with SCHED_FIFO scheduling\n");
     printf("  RTU thread: priority 99, period 1ms\n");
@@ -83,6 +87,8 @@ int main(int argc, char *argv[]) {
     int mode_rtu = 1;
     int mode_tcp = 1;
     const char *rtu_device = MODBUS_RTU_DEFAULT_DEV;
+    const char *network_config_file = NULL;
+    const char *gpio_config_file = NULL;
 
     // Parse command line options
     int opt;
@@ -102,6 +108,12 @@ int main(int argc, char *argv[]) {
             break;
         case 'd':
             rtu_device = optarg;
+            break;
+        case 'n':
+            network_config_file = optarg;
+            break;
+        case 'c':
+            gpio_config_file = optarg;
             break;
         case 'v':
             g_log_level = LOG_LEVEL_DEBUG;
@@ -138,12 +150,18 @@ int main(int argc, char *argv[]) {
     if (rt_gpio_init() == 0) {
         printf("[MAIN-RT] RT GPIO initialized (mmap mode)\n");
     } else {
-        printf("[MAIN-RT] RT GPIO init failed, using simulated mode\n");
+        printf("[MAIN-RT] RT GPIO init failed, using sysfs mode\n");
     }
 
-    // Initialize data simulator
-    printf("[MAIN-RT] Initializing data simulator...\n");
-    data_sim_init();
+    // Initialize hardware
+    printf("[MAIN-RT] Initializing hardware...\n");
+    hardware_init();
+
+    // Load network config if specified
+    if (network_config_file) {
+        printf("[MAIN-RT] Loading network config from %s...\n", network_config_file);
+        hardware_load_config(network_config_file);
+    }
 
     // Thread stack size (64KB for RT threads)
     #define RT_THREAD_STACK (64 * 1024)
@@ -186,6 +204,7 @@ int main(int argc, char *argv[]) {
 
     // Cleanup
     rt_gpio_cleanup();
+    hardware_release();
     rt_unlock_memory();
 
     printf("[MAIN-RT] Exit\n");
